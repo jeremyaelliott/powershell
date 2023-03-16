@@ -47,12 +47,23 @@ $authorizationToken = '{0} {1}' -f $token.token_type,$token.access_token
 Function Get-APIQuery{
     param(
         $URI, 
+        $Parameters,
         $authorization
     )
-    $query = Invoke-RestMethod -Uri $URI -Headers @{'Authorization' = $authorization}
+    $RequestParameters = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    ForEach($Key in $Parameters.Keys){
+        $RequestParameters.Add($Key,$Parameters[$Key])
+    }
+    $Request = [System.UriBuilder]$URI
+    $Request.Query = $RequestParameters.ToString()
+    $query = Invoke-RestMethod -Uri $Request.uri -Headers @{'Authorization' = $authorization}
+
+    $RequestParameters.Add('page',0)
     $totalPages = $query.paging.totalPages
     For ($page=1; $page -le $totalPages; $page++) {
-	    $query = Invoke-RestMethod -Uri ('{0}?page={1}' -f $URI,$page) -Headers @{'Authorization' = $authorization}
+        $RequestParameters['page'] = $page
+        $Request.Query = $RequestParameters.ToString()
+	    $query = Invoke-RestMethod -Uri $Request.uri -Headers @{'Authorization' = $authorization}
         $query.records
     }
 }
@@ -60,6 +71,7 @@ Function Get-APIQuery{
 #Query Example
 $getAPIQuerySplat= @{
     URI = '{0}/restapi/v1.0/account/~/extension' -f $server
+    #Parameters = @{'view'='Detailed'} #Example of Parameters
     Authorization = $authorizationToken
 }
 $extensionRecords = Get-APIQuery @getAPIQuerySplat
